@@ -17,7 +17,7 @@ import Pkg; Pkg.add("Tables")
 ## Использование
 
 ```
-julia zaudio.jl test.jl
+julia zaudio.jl test.wav
 
 ```
 
