@@ -7,6 +7,7 @@ using Tables
 using CSV
 using DSP
 using SignalAnalysis
+using DataFrames
 
 # Папка сохранения полученных датасетов
 
@@ -31,6 +32,10 @@ window_duration = 0.04;
 
 energy_level = 50
 
+# Количество кадров для сглаживания скользящей средней слепка аудио-данных
+
+m_offset = 20
+
 # Чтение WAV-файла
 
 function read()
@@ -44,6 +49,39 @@ function read()
         println("Не указан входной файл")
         exit()
     end    
+end
+
+# Загрузка сохраненного файла данных очищенных окон с преобразованием в среднеквадратичное отклонение по частотным полосам
+
+function load(filename)::Vector{Any}
+    if !isempty(filename) 
+        try        
+            data = CSV.read(data_dir*filename, DataFrame, skipto=2)  
+            ret = []
+            map(eachrow(data)) do col
+                push!(ret,std(col))
+            end  
+            return ret
+        catch e
+            println("Ошибка чтения wav-файла: "*e)
+        end
+    else
+        println("Не указан входной файл")
+        exit()
+    end      
+end
+
+# Скользящее среднее
+
+function m_average(arr::Vector{Float64}, n::Number)::Vector{Any}
+    so_far = sum(arr[1:n])
+    out = zero(arr[n:end])
+    out[1] = so_far
+    for (i, (start, stop)) in enumerate(zip(arr, arr[n+1:end]))
+        so_far += stop - start
+        out[i+1] = so_far
+    end
+    return out
 end
 
 # Нормализация уровня
@@ -74,7 +112,7 @@ function filter(audio_input::Matrix{Float64},window_length::Number)::Matrix{Floa
         ) + 1  
     local i = 0
     for j = 1:(number_times-10) # 10 последних кадров отбарсываем
-        frame = audio_input[i+1:i+window_length]        
+        frame = audio_input[i+1:i+window_length]           
         if energy(frame) > energy_level
             output_signal = [output_signal;frame]
         end
@@ -102,22 +140,50 @@ function spectrogram(audio::Matrix{Float64},freq::Number)::Matrix{Float64}
     local plot_object = zaf.specshow(audio_spectrogram, number_samples, freq, xtick_step, ytick_step)
     heatmap!(title = "Spectrogram (dB)", size = (990, 600))
     savefig(plot_object, data_dir*ARGS[1]*"-"*"spectr.png")
-    CSV.write(data_dir*ARGS[1]*"-"*"spectr.csv", Tables.table(audio_spectrogram))
+    #CSV.write(data_dir*ARGS[1]*"-"*"spectr.csv", Tables.table(audio_spectrogram))
     return audio_spectrogram
 end
 
-# CQT-октавное преобразование
+# CQT-октавное вевлет-преобразование
 
 function cqt(audio::Matrix{Float64},freq::Number)::Matrix{Float64}
     local cqt_kernel = zaf.cqtkernel(freq, octave_resolution, minimum_frequency, maximum_frequency)
     cqt_spectrogram = zaf.cqtspectrogram(audio, freq, time_resolution, cqt_kernel)
+    CSV.write(data_dir*ARGS[1]*"-"*"cqt.csv", Tables.table(cqt_spectrogram))
     local xtick_step = 1
     local plot_object = zaf.cqtspecshow(cqt_spectrogram, time_resolution, octave_resolution, minimum_frequency, xtick_step)
     heatmap!(title = "CQT spectrogram (dB)", size = (990, 600))
-    savefig(plot_object, data_dir*ARGS[1]*"-"*"cqt.png")
-    CSV.write(data_dir*ARGS[1]*"-"*"cqt.csv", Tables.table(cqt_spectrogram))
+    savefig(plot_object, data_dir*ARGS[1]*"-"*"cqt.png")   
     return cqt_spectrogram
 end
+
+# Преобразование вевлет-спектрограммы в спектр среднего значения по октавам со сглаживанием
+
+function raft(spectr::Matrix{Float64})::Vector{Any} 
+    freqs, frames = size(spectr)
+    raft_data = zeros(freqs)
+    for i in 1:freqs
+        raft_data[i] = mean(spectr[i, :])
+    end
+    return m_average(raft_data,m_offset)
+end
+
+# Cохранение образа записи
+
+function save(audio_data::Vector{Any},freq::Number)::Vector{Any}
+    CSV.write(data_dir*ARGS[1]*"-"*"analise.csv", Tables.table(audio_data))
+    numbers = length(audio_data)       
+    xtick_locations = [0:octave_resolution:numbers;]
+    xtick_labels = convert(
+        Array{Int},
+        minimum_frequency * 2 .^ (xtick_locations / octave_resolution),
+    )    
+    plot_object = plot(audio_data, xticks = (xtick_locations, xtick_labels))
+    plot!(title = "Sound form", size = (990, 600))
+    savefig(plot_object, data_dir*ARGS[1]*"-"*"analise.png")    
+    return audio_data
+end
+
 
 # Считываем данные из WAV файла и нормализуем их, частота дискретизации получается из заголовка WAV-файла
 
@@ -137,6 +203,21 @@ spectrogram(audio_input,freq)
 
 audio = filter(audio_input,window_length)
 
+frames, freqs = size(audio)
+
+if frames<5 
+    println("Файл не прошел фильтр суммарной энергии сигнала")
+    exit()
+end
+
 # Осущетсвляем CQT-преобразование и сохранение спектограммы и массива данных
 
-cqt(audio,freq)
+cqt_spectrogram = cqt(audio,freq)
+
+# Преобразуем спектограмму в с спектр среднеквадратичных отклонений
+
+raft_data = raft(cqt_spectrogram)
+
+# Cохраняем результат
+
+save(raft_data,freq)

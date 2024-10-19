@@ -56,6 +56,13 @@ println(audio_data[1:41])
 
 audio_data = m_average(audio_data,20)
 
-plot_object = plot(audio_data)
+numbers = size(mel_spectrogram)
+
+minimum_mel = 2595 * log10(1 + (freq / window_length) / 700)
+maximum_mel = 2595 * log10(1 + (freq / 2) / 700)
+mel_scale = range(minimum_mel, stop = maximum_mel, length = numbers)
+hertz_scale = 700 .* (10 .^ (mel_scale / 2595) .- 1)
+
+plot_object = plot(audio_data, xticks = convert(Array{Int}, round.(hertz_scale[1:8:numbers])))
 plot!(title = "Sound form", size = (990, 600))
 savefig(plot_object, data_dir*ARGS[1]*"-"*"analize.png")
