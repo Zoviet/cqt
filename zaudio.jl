@@ -12,6 +12,10 @@ using SignalAnalysis
 
 data_dir = "datasets/"
 
+# Папка исходных аудио-файлов
+
+files_dir = "files/"
+
 # Настройки CQT преобразования
 
 octave_resolution = 24
@@ -32,7 +36,7 @@ energy_level = 50
 function read()
     if !isempty(ARGS) 
         try
-            return wavread(ARGS[1])     
+            return wavread(files_dir*ARGS[1])     
         catch e
             println("Ошибка чтения wav-файла: "*e)
         end
@@ -98,6 +102,7 @@ function spectrogram(audio::Matrix{Float64},freq::Number)::Matrix{Float64}
     local plot_object = zaf.specshow(audio_spectrogram, number_samples, freq, xtick_step, ytick_step)
     heatmap!(title = "Spectrogram (dB)", size = (990, 600))
     savefig(plot_object, data_dir*ARGS[1]*"-"*"spectr.png")
+    CSV.write(data_dir*ARGS[1]*"-"*"spectr.csv", Tables.table(audio_spectrogram))
     return audio_spectrogram
 end
 
@@ -123,6 +128,10 @@ audio_input, freq = normalize(audio_input, freq)
 # Исходя из частоты дискретизации получаем длину кадров и шаг между ними
 
 window_length,step_length,window_function = windows(freq)
+
+# Сохраняем спектограмму исходного сигнала
+
+spectrogram(audio_input,freq)
 
 # Фильтруем кадры, отбрасывая кадры с низкой энергией
 
