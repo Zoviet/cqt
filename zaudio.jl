@@ -48,15 +48,15 @@ function normalize(audio_input::Matrix{Float64},freq::Number)
     return mean(audio_input, dims=2), freq
 end
 
-# Разбитие на кадры
+# Разбитие на окна
 
 function windows(freq::Number)
     local window_length = nextpow(2, ceil(Int, window_duration*freq))
-    local window_function = zaf.hamming(window_length, "periodic")
+    local window_function = zaf.hamming(window_length, "periodic") #  оконная аналитическая функция
     return window_length, convert(Int, window_length/2), window_function
 end
 
-# Фильтрация кадров по уровню минимальной энергии звука в каждом кадре
+# Фильтрация окон по уровню минимальной энергии звука в каждом окне
 
 function filter(audio_input::Matrix{Float64},window_length::Number)::Matrix{Float64}
     output_signal = zeros(1,1)
