@@ -12,6 +12,7 @@ import Pkg; Pkg.add("Plots")
 import Pkg; Pkg.add("CSV")
 import Pkg; Pkg.add("Tables")
 import Pkg; Pkg.add("DataFrames")
+import Pkg; Pkg.add("WAV")
 
 ```
 

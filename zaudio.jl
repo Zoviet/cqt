@@ -43,7 +43,7 @@ function read()
         try
             return wavread(files_dir*ARGS[1])     
         catch e
-            println("Ошибка чтения wav-файла: "*e)
+            println("Ошибка чтения wav-файла")
         end
     else
         println("Не указан входной файл")
@@ -56,14 +56,10 @@ end
 function load(filename)::Vector{Any}
     if !isempty(filename) 
         try        
-            data = CSV.read(data_dir*filename, DataFrame, skipto=2)  
-            ret = []
-            map(eachrow(data)) do col
-                push!(ret,std(col))
-            end  
-            return ret
+            data = CSV.read(filename, DataFrame, skipto=2)
+            return data[!, :Column1]   
         catch e
-            println("Ошибка чтения wav-файла: "*e)
+            println("Ошибка чтения csv-файла")
         end
     else
         println("Не указан входной файл")
